@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Toma de Inventario · Planchas</title>
+<link rel="icon" type="image/png" href="../_compartido/logo-cmt-trans.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --pink:#e0234e; --teal:#0fa595; --violet:#7c3aed;
+  --bg:#f4f5f7; --panel:#fff; --ink:#1f2430; --muted:#6b7280; --muted-2:#9ca3af;
+  --border:#e5e7eb; --ok:#0fa595; --warn:#d97706; --danger:#e0234e;
+  --sh:0 2px 10px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'DM Sans',system-ui,sans-serif;}
+.mono{font-family:'DM Mono',monospace;}
+h1,h2,h3{font-family:'Space Grotesk',sans-serif;margin:0;}
+button,input,select{font-family:inherit;font-size:16px;}
+button{cursor:pointer;}
+
+/* ── BRAND BAR (identidad CMT, igual que las vistas públicas) ── */
+.brandbar{background:#0d1526;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;}
+.brandbar .wm{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;letter-spacing:-.5px;}
+.brandbar .wm .c1{color:var(--pink);} .brandbar .wm .c2{color:#fff;} .brandbar .wm .c3{color:var(--teal);}
+.brandbar small{font-size:10px;letter-spacing:2px;color:#8b93a7;text-transform:uppercase;}
+
+/* ── LOGIN ── */
+#login{min-height:calc(100dvh - 46px);display:flex;align-items:center;justify-content:center;padding:24px;}
+.login-card{background:var(--panel);border-radius:20px;box-shadow:var(--sh);padding:30px 24px;width:100%;max-width:380px;}
+.login-card img{height:38px;margin-bottom:16px;}
+.login-card h1{font-size:20px;letter-spacing:-.3px;}
+.login-card p{font-size:13px;color:var(--muted);margin:6px 0 20px;}
+.fld{margin-bottom:14px;}
+.fld label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;}
+.fld input{width:100%;padding:13px 14px;border:1px solid var(--border);border-radius:12px;outline:none;}
+.fld input:focus{border-color:var(--pink);}
+.btn{border:none;border-radius:12px;padding:13px 16px;font-weight:600;font-size:15px;transition:transform .12s ease, opacity .15s;}
+.btn:active{transform:scale(.97);}
+.chip{border:1px solid var(--border);background:#fff;border-radius:999px;padding:9px 14px;font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap;transition:all .15s;}
+.chip.on{background:var(--teal);border-color:var(--teal);color:#fff;}
+.btn-primary{background:var(--pink);color:#fff;width:100%;}
+.btn-primary:disabled{opacity:.6;}
+.err{color:var(--danger);font-size:13px;margin-top:10px;display:none;}
+
+/* ── APP ── */
+#app{display:none;min-height:100dvh;display:none;flex-direction:column;}
+.topbar{position:sticky;top:0;z-index:20;background:var(--panel);border-bottom:1px solid var(--border);padding:10px 14px;box-shadow:0 1px 6px rgba(0,0,0,.04);}
+.topbar .row1{display:flex;align-items:center;gap:10px;}
+.topbar h1{font-size:16px;flex:1;}
+.who{font-size:11px;color:var(--muted);text-align:right;line-height:1.3;}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.tools input{flex:1 1 100%;}
+.tools select{flex:1;}
+.tools input,.tools select{min-width:0;padding:10px 12px;border:1px solid var(--border);border-radius:10px;outline:none;background:#fff;}
+.tools input:focus,.tools select:focus{border-color:var(--teal);}
+.progress{font-size:12px;color:var(--muted);margin-top:8px;display:flex;flex-wrap:wrap;gap:4px 10px;}
+.progress b{color:var(--ink);}
+
+.list{padding:12px 12px 120px;display:flex;flex-direction:column;gap:10px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:13px 14px;box-shadow:var(--sh);}
+.card.done-confirmada{border-left:4px solid var(--ok);}
+.card.done-mover{border-left:4px solid var(--violet);}
+.card.done-estilo{border-left:4px solid var(--teal);}
+.card.done-retirar{border-left:4px solid var(--danger);}
+.card.done-faltante{border-left:4px solid var(--warn);}
+.card .cod{font-family:'DM Mono',monospace;font-weight:600;font-size:15px;}
+.card .meta{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.5;}
+.card .meta .tag{display:inline-block;background:#f1f5f9;border-radius:6px;padding:1px 7px;margin-right:4px;}
+.card select,.card input{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:10px;margin-top:9px;outline:none;background:#fff;}
+.card select:focus,.card input:focus{border-color:var(--teal);}
+.det{margin-top:0;}
+
+.savebar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--panel);border-top:1px solid var(--border);padding:12px 14px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -2px 12px rgba(0,0,0,.08);}
+.savebar .btn-primary{background:var(--teal);}
+.empty{text-align:center;color:var(--muted);padding:40px 20px;}
+
+/* toast */
+#toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-size:14px;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none;max-width:92vw;text-align:center;}
+#toast.show{opacity:1;}
+#toast.err{background:var(--danger);}
+</style>
+</head>
+<body>
+
+<div class="brandbar">
+  <span class="wm"><span class="c1">C</span><span class="c2">M</span><span class="c3">T</span></span>
+  <small>Cut · Make &amp; Trims</small>
+</div>
+
+<!-- ══════ LOGIN ══════ -->
+<div id="login">
+  <div class="login-card">
+    <img src="../_compartido/logo-cmt-trans.png" onerror="this.style.display='none'">
+    <h1>Toma de Inventario</h1>
+    <p>Planchas · acceso de Ingeniería / Administración.</p>
+    <div class="fld"><label>Usuario</label><input id="lg-user" autocomplete="username" autocapitalize="off"></div>
+    <div class="fld"><label>Contraseña</label><input id="lg-pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <button class="btn btn-primary" id="lg-btn" onclick="doLogin()">Ingresar</button>
+    <div class="err" id="lg-err">Usuario o contraseña incorrectos, o sin permiso.</div>
+  </div>
+</div>
+
+<!-- ══════ APP ══════ -->
+<div id="app">
+  <div class="topbar">
+    <div class="row1">
+      <h1>🧮 Toma de Inventario</h1>
+      <div class="who"><b id="who-name">—</b><br><span id="who-rol">—</span></div>
+    </div>
+    <div class="tools">
+      <input id="q" placeholder="🔍 Código o línea…" oninput="render()">
+      <select id="fLinea" onchange="render()"><option value="">Todas</option></select>
+      <button class="chip" id="fPend" onclick="this.classList.toggle('on');render()">Pendientes</button>
+    </div>
+    <div class="progress" id="progress"></div>
+  </div>
+  <div class="list" id="list"></div>
+  <div class="savebar">
+    <button class="btn btn-primary" onclick="guardar()">💾 Guardar toma de inventario</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ── Supabase (mismo backend que planchas.html) ── */
+const SUPABASE_URL='https://mwhrilqgikdubmnafapb.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13aHJpbHFnaWtkdWJtbmFmYXBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MDgyOTcsImV4cCI6MjA5NDI4NDI5N30.Ia_1drRoMvJWf-Rir2YLCca1Obrg6f4k9Ukcb6joG7M';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false}});
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg,type){const t=$('toast');t.textContent=msg;t.className=type==='err'?'show err':'show';clearTimeout(t._t);t._t=setTimeout(()=>t.className='',2600);}
+function uuid(){return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);});}
+function normRol(r){return String(r||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+const MOTIVOS=['No se usa','Reproceso','Devolución'];
+
+let SESSION=null;
+let PLANCHAS=[], MOVS=[], LINEAS=[];
+let T={};   // decisiones por plancha id → {accion, linea, estilo, motivo}
+
+/* ── LOGIN ── */
+async function doLogin(){
+  const u=$('lg-user').value.trim(), p=$('lg-pass').value;
+  const btn=$('lg-btn'); $('lg-err').style.display='none';
+  if(!u||!p) return;
+  btn.disabled=true; btn.textContent='Verificando…';
+  try{
+    const {data}=await sb.from('usuarios').select('id,nombre,username,rol').ilike('username',u).eq('password',p).maybeSingle();
+    const rol=data?normRol(data.rol):'';
+    if(!data || !['admin','administrador','ingenieria','jefe_ingenieria'].includes(rol)){
+      $('lg-err').style.display='block'; btn.disabled=false; btn.textContent='Ingresar'; return;
+    }
+    SESSION={id:data.id,nombre:data.nombre,rol};
+    $('who-name').textContent=data.nombre;
+    $('who-rol').textContent=rol;
+    $('login').style.display='none';
+    $('app').style.display='flex';
+    await cargar();
+  }catch(e){ $('lg-err').textContent='Error de conexión: '+(e.message||e); $('lg-err').style.display='block'; btn.disabled=false; btn.textContent='Ingresar'; }
+}
+
+/* ── CARGA ── */
+async function cargar(){
+  $('list').innerHTML='<div class="empty">Cargando planchas…</div>';
+  try{
+    const [{data:pDB},{data:mDB},{data:lDB}]=await Promise.all([
+      sb.from('planchas').select('id,codigo,tipo,estado,linea_actual,asignacion_id').order('codigo'),
+      sb.from('movimientos').select('id,estilo'),
+      sb.from('lineas').select('nombre')
+    ]);
+    PLANCHAS=(pDB||[]).filter(p=>p.estado!=='baja');
+    MOVS=mDB||[];
+    LINEAS=(lDB||[]).map(l=>l.nombre).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+    const fl=$('fLinea');
+    fl.innerHTML='<option value="">Todas</option><option value="__ing__">En Ingeniería</option>'+LINEAS.map(l=>`<option value="${esc(l)}">${esc(l)}</option>`).join('');
+    T={};
+    render();
+  }catch(e){ $('list').innerHTML='<div class="empty">No se pudo cargar: '+esc(e.message||e)+'</div>'; }
+}
+
+function estiloActual(p){ const m=MOVS.find(x=>x.id===p.asignacion_id); return (m&&m.estilo)?m.estilo:'—'; }
+
+/* ── RENDER ── */
+function render(){
+  const q=($('q').value||'').toLowerCase();
+  const flin=$('fLinea').value;
+  const soloPend=$('fPend').classList.contains('on');
+  let rows=PLANCHAS.filter(p=>{
+    const mQ=(p.codigo||'').toLowerCase().includes(q)||(p.linea_actual||'').toLowerCase().includes(q);
+    let mL=true;
+    if(flin==='__ing__') mL=!p.linea_actual; else if(flin) mL=p.linea_actual===flin;
+    const mP=!soloPend || !(T[p.id]&&T[p.id].accion);
+    return mQ&&mL&&mP;
+  });
+  const list=$('list');
+  if(!rows.length){ list.innerHTML='<div class="empty">Sin planchas para el filtro.</div>'; progreso(); return; }
+  list.innerHTML=rows.map(cardHTML).join('');
+  progreso();
+}
+
+function cardHTML(p){
+  const t=T[p.id]||{};
+  const acc=t.accion||'';
+  const ubic=p.linea_actual?esc(p.linea_actual):'Ingeniería';
+  const o=(v,txt)=>`<option value="${v}"${acc===v?' selected':''}>${txt}</option>`;
+  return `<div class="card ${acc?'done-'+acc:''}" id="card-${p.id}">
+    <div class="cod">${esc(p.codigo)}</div>
+    <div class="meta"><span class="tag">${esc(p.tipo||'—')}</span> 📍 ${ubic} · 🎨 ${esc(estiloActual(p))}</div>
+    <select onchange="setAccion('${p.id}',this.value)">
+      ${o('','— sin revisar —')}
+      ${o('confirmada','✅ Está donde dice')}
+      ${o('mover','➡️ Mover de línea')}
+      ${o('estilo','🎨 Cambió el estilo')}
+      ${o('retirar','🚫 Retirar')}
+      ${o('faltante','❓ No está / no se encuentra')}
+    </select>
+    <div class="det" id="det-${p.id}">${detHTML(p.id)}</div>
+  </div>`;
+}
+
+function detHTML(id){
+  const t=T[id]||{}; const p=PLANCHAS.find(x=>x.id===id); if(!p) return '';
+  if(t.accion==='mover'){
+    const opts=LINEAS.filter(l=>l!==p.linea_actual).map(l=>`<option value="${esc(l)}"${t.linea===l?' selected':''}>${esc(l)}</option>`).join('');
+    return `<select onchange="T['${id}'].linea=this.value"><option value="">— línea destino —</option>${opts}</select>`;
+  }
+  if(t.accion==='estilo'){
+    const cur=t.estilo!==undefined?t.estilo:(estiloActual(p)==='—'?'':estiloActual(p));
+    return `<input type="text" value="${esc(cur)}" oninput="T['${id}'].estilo=this.value" placeholder="Nuevo estilo">`;
+  }
+  if(t.accion==='retirar'){
+    return `<select onchange="T['${id}'].motivo=this.value"><option value="">— motivo del retiro —</option>${MOTIVOS.map(m=>`<option value="${m}"${t.motivo===m?' selected':''}>${m}</option>`).join('')}</select>`;
+  }
+  return '';
+}
+
+function setAccion(id,val){
+  if(!T[id])T[id]={};
+  T[id].accion=val;
+  const p=PLANCHAS.find(x=>x.id===id);
+  if(val==='estilo' && T[id].estilo===undefined){ const e=estiloActual(p); T[id].estilo=(e==='—'?'':e); }
+  $('det-'+id).innerHTML=detHTML(id);
+  const card=$('card-'+id); if(card) card.className='card '+(val?'done-'+val:'');
+  progreso();
+}
+
+function progreso(){
+  const vals=Object.values(T).filter(v=>v.accion);
+  const c=a=>vals.filter(v=>v.accion===a).length;
+  $('progress').innerHTML=`Revisadas <b>${vals.length}</b>/${PLANCHAS.length} · ✅ ${c('confirmada')} · ➡️ ${c('mover')} · 🎨 ${c('estilo')} · 🚫 ${c('retirar')} · ❓ ${c('faltante')}`;
+}
+
+/* ── GUARDAR ── */
+async function guardar(){
+  const ids=Object.keys(T).filter(id=>T[id].accion);
+  if(!ids.length) return toast('No marcaste ninguna acción.','err');
+  for(const id of ids){ const t=T[id];
+    if(t.accion==='mover' && !t.linea) return toast('Falta la línea destino en una plancha a mover.','err');
+    if(t.accion==='retirar' && !t.motivo) return toast('Falta el motivo en una plancha a retirar.','err');
+    if(t.accion==='estilo' && !(t.estilo||'').trim()) return toast('El estilo no puede quedar vacío.','err');
+  }
+  if(!confirm(`Vas a guardar la toma de inventario de ${ids.length} plancha(s). ¿Continuar?`)) return;
+  toast('Guardando…');
+  const today=new Date().toISOString().slice(0,10);
+  const nowISO=new Date().toISOString();
+  const cnt={confirmada:0,mover:0,estilo:0,retirar:0,faltante:0};
+  const items=[];
+  try{
+    for(const id of ids){
+      const t=T[id]; const p=PLANCHAS.find(x=>x.id===id); if(!p) continue;
+      const estAntes=estiloActual(p); const linAntes=p.linea_actual||null; cnt[t.accion]++;
+      const base={plancha_id:p.id,codigo:p.codigo,accion:t.accion,linea_antes:linAntes,estilo_antes:estAntes};
+      if(t.accion==='confirmada'){
+        items.push({...base,linea_despues:linAntes,estilo_despues:estAntes});
+      } else if(t.accion==='faltante'){
+        items.push({...base,linea_despues:linAntes,estilo_despues:estAntes,motivo:'No encontrada'});
+        await hist(p.codigo,`❓ Inventario: no se encontró (${linAntes||'Ingeniería'})`,nowISO);
+      } else if(t.accion==='estilo'){
+        const nuevo=t.estilo.trim();
+        if(p.asignacion_id) await sb.from('movimientos').update({estilo:nuevo}).eq('id',p.asignacion_id);
+        await hist(p.codigo,`🎨 Inventario: estilo ${estAntes} → ${nuevo}`,nowISO);
+        items.push({...base,linea_despues:linAntes,estilo_despues:nuevo});
+      } else if(t.accion==='mover'){
+        const destino=t.linea, movId=uuid();
+        await sb.from('movimientos').insert({id:movId,tipo:p.linea_actual?'reasignacion':'asignacion',plancha_id:p.id,codigo:p.codigo,de:linAntes||'Ingeniería',hacia:destino,responsable:SESSION.nombre,fecha:today,motivo:'Toma de inventario',estilo:estAntes!=='—'?estAntes:null});
+        await sb.from('planchas').update({linea_actual:destino,asignacion_id:movId,estado:'ok'}).eq('id',p.id);
+        await hist(p.codigo,`➡️ Inventario: movida de ${linAntes||'Ingeniería'} a ${destino}`,nowISO);
+        items.push({...base,linea_despues:destino,estilo_despues:estAntes});
+      } else if(t.accion==='retirar'){
+        await sb.from('movimientos').insert({id:uuid(),tipo:'devolucion',plancha_id:p.id,codigo:p.codigo,de:linAntes||'Ingeniería',hacia:'Ingeniería',responsable:SESSION.nombre,fecha:today,motivo:t.motivo});
+        await sb.from('planchas').update({linea_actual:null,asignacion_id:null,estado:'ok'}).eq('id',p.id);
+        await hist(p.codigo,`🚫 Inventario: retirada (${t.motivo}) de ${linAntes||'Ingeniería'} → Ingeniería`,nowISO);
+        items.push({...base,linea_despues:null,estilo_despues:estAntes,motivo:t.motivo});
+      }
+    }
+    const {data:inv,error:invErr}=await sb.from('inventarios').insert({
+      usuario_id:SESSION.id||null, usuario_nombre:SESSION.nombre, total:PLANCHAS.length,
+      revisadas:ids.length, confirmadas:cnt.confirmada, movidas:cnt.mover, estilos:cnt.estilo, retiradas:cnt.retirar, faltantes:cnt.faltante
+    }).select('id').single();
+    if(invErr) throw invErr;
+    const withFk=items.map(it=>({...it,inventario_id:inv.id}));
+    for(let i=0;i<withFk.length;i+=200){ const {error}=await sb.from('inventario_items').insert(withFk.slice(i,i+200)); if(error) throw error; }
+    toast(`✓ Toma guardada · ${ids.length} planchas`);
+    await cargar();
+  }catch(e){ console.error(e); toast('Error al guardar: '+(e.message||e),'err'); }
+}
+
+async function hist(codigo,texto,fecha){
+  try{ await sb.from('historial').insert({id:uuid(),tipo:'inventario',codigo,texto,usuario:SESSION.nombre,fecha}); }
+  catch(e){ console.warn('historial:',e.message); }
+}
+</script>
+</body>
+</html>
